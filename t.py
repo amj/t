@@ -236,10 +236,7 @@ class TaskDict(object):
             print
             print fabulous.color.bold(_colorize_word(token))
             for task in tasks:
-                if sys.stdout.isatty(): 
-                    p = _id_color('%s' % task[label].ljust(plen)) + ' - ' if not quiet else ''
-                else:
-                    p = '%s - ' % task[label].ljust(plen) if not quiet else ''
+                p = _id_color('%s' % task[label].ljust(plen)) + ' - ' if not quiet else ''
                 color_text = map(_colorize_word, task['text'].split()) 
                 print p + " ".join(map(str,color_text) ) 
 
@@ -258,10 +255,8 @@ class TaskDict(object):
             elif not tasks and os.path.isfile(path):
                 os.remove(path)
 
-def _colorize_word(word):
-    if not sys.stdout.isatty():
-        return word
-    elif word.startswith(('+', '#')):
+def _colorize_word(word): 
+    if word.startswith(('+', '#')):
         return _tag_color(word)
     elif word.startswith('@'):
         return _location_color(word)
