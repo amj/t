@@ -12,7 +12,7 @@ import fabulous.color
 
 _tag_color = fabulous.color.green
 _location_color = fabulous.color.cyan
-_id_color = lambda _: fabulous.color.bold(fabulous.color.green(_))
+_id_color = lambda _: fabulous.color.bold(fabulous.color.yellow(_))
 
 class InvalidTaskfile(Exception):
     """Raised when the path to a task file already exists as a directory."""
@@ -145,6 +145,8 @@ class TaskDict(object):
                     for task in tasks:
                         if task is not None:
                             getattr(self, kind)[task['id']] = task
+                            task['text']
+
 
     def __getitem__(self, prefix):
         """Return the unfinished task with the given prefix.
@@ -204,7 +206,8 @@ class TaskDict(object):
         """Print out a nicely formatted list of unfinished tasks.
         
         Support printing colors for tags (tokens in 'text' with a leading '+'
-        or '#') and locations (tokens in 'text' with a '@')
+        or '#') and locations (tokens in 'text' with a '@'), as well as grouping
+        those tokens.
 
         """
         tasks = dict(getattr(self, kind).items())
@@ -214,9 +217,25 @@ class TaskDict(object):
             for task_id, prefix in _prefixes(tasks).items():
                 tasks[task_id]['prefix'] = prefix
 
+        grep_filter = lambda t: True if grep.lower() in t['text'].lower() else False 
+        grepped_tasks = filter(grep_filter, tasks.values())
+
+        tokens = reduce( lambda s1, l2: s1.union(set(l2)),
+                     [[token for token in t['text'].split()
+                        if token.startswith(('@', '+', '#'))] for t in grepped_tasks],
+                        set(),
+                          )
+
+        grouped_tasks = dict([ 
+                            (token, filter(lambda t: token in t['text'].split(), 
+                                    grepped_tasks)) 
+                            for token in tokens])
+
         plen = max(map(lambda t: len(t[label]), tasks.values())) if tasks else 0 
-        for _, task in sorted(tasks.items()):
-            if grep.lower() in task['text'].lower():
+        for token, tasks in sorted(grouped_tasks.items()):
+            print
+            print fabulous.color.bold(_colorize_word(token))
+            for task in tasks:
                 if sys.stdout.isatty(): 
                     p = _id_color('%s' % task[label].ljust(plen)) + ' - ' if not quiet else ''
                 else:
