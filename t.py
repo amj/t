@@ -8,6 +8,11 @@ import os, re, sys, hashlib
 from operator import itemgetter
 from optparse import OptionParser, OptionGroup
 
+import fabulous.color 
+
+_tag_color = fabulous.color.green
+_location_color = fabulous.color.cyan
+_id_color = lambda _: fabulous.color.bold(fabulous.color.green(_))
 
 class InvalidTaskfile(Exception):
     """Raised when the path to a task file already exists as a directory."""
@@ -193,7 +198,12 @@ class TaskDict(object):
         self.done[task['id']] = task
 
     def print_list(self, kind='tasks', verbose=False, quiet=False, grep=''):
-        """Print out a nicely formatted list of unfinished tasks."""
+        """Print out a nicely formatted list of unfinished tasks.
+        
+        Support printing colors for tags (tokens in 'text' with a leading '+'
+        or '#') and locations (tokens in 'text' with a '@')
+
+        """
         tasks = dict(getattr(self, kind).items())
         label = 'prefix' if not verbose else 'id'
 
@@ -201,11 +211,12 @@ class TaskDict(object):
             for task_id, prefix in _prefixes(tasks).items():
                 tasks[task_id]['prefix'] = prefix
 
-        plen = max(map(lambda t: len(t[label]), tasks.values())) if tasks else 0
+        plen = max(map(lambda t: len(t[label]), tasks.values())) if tasks else 0 
         for _, task in sorted(tasks.items()):
             if grep.lower() in task['text'].lower():
-                p = '%s - ' % task[label].ljust(plen) if not quiet else ''
-                print p + task['text']
+                p = _id_color('%s' % task[label].ljust(plen)) + ' - ' if not quiet else ''
+                color_text = map(_colorize_word, task['text'].split()) 
+                print p + " ".join(map(str,color_text) ) 
 
     def write(self, delete_if_empty=False):
         """Flush the finished and unfinished tasks to the files on disk."""
@@ -221,6 +232,14 @@ class TaskDict(object):
                         tfile.write(taskline)
             elif not tasks and os.path.isfile(path):
                 os.remove(path)
+
+def _colorize_word(word):
+    if word.startswith(('+', '#')):
+        return _tag_color(word)
+    elif word.startswith('@'):
+        return _location_color(word)
+    else:
+        return word
 
 
 def _build_parser():
