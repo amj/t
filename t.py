@@ -214,7 +214,10 @@ class TaskDict(object):
         plen = max(map(lambda t: len(t[label]), tasks.values())) if tasks else 0 
         for _, task in sorted(tasks.items()):
             if grep.lower() in task['text'].lower():
-                p = _id_color('%s' % task[label].ljust(plen)) + ' - ' if not quiet else ''
+                if sys.stdout.isatty(): 
+                    p = _id_color('%s' % task[label].ljust(plen)) + ' - ' if not quiet else ''
+                else:
+                    p = '%s - ' % task[label].ljust(plen) if not quiet else ''
                 color_text = map(_colorize_word, task['text'].split()) 
                 print p + " ".join(map(str,color_text) ) 
 
@@ -234,7 +237,9 @@ class TaskDict(object):
                 os.remove(path)
 
 def _colorize_word(word):
-    if word.startswith(('+', '#')):
+    if not sys.stdout.isatty():
+        return word
+    elif word.startswith(('+', '#')):
         return _tag_color(word)
     elif word.startswith('@'):
         return _location_color(word)
