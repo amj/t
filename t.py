@@ -202,7 +202,7 @@ class TaskDict(object):
         task = self.tasks.pop(self[prefix]['id'])
         self.done[task['id']] = task
 
-    def print_list(self, kind='tasks', verbose=False, quiet=False, grep=''):
+    def print_list(self, kind='tasks', verbose=False, quiet=False, grep='', dump=False):
         """Print out a nicely formatted list of unfinished tasks.
         
         Support printing colors for tags (tokens in 'text' with a leading '+'
@@ -220,16 +220,26 @@ class TaskDict(object):
         grep_filter = lambda t: True if grep.lower() in t['text'].lower() else False 
         grepped_tasks = filter(grep_filter, tasks.values())
 
-        tokens = reduce( lambda s1, l2: s1.union(set(l2)),
-                     [[token for token in t['text'].split()
-                        if token.startswith(('@', '+', '#'))] for t in grepped_tasks],
-                        set(),
-                          )
+        if not dump:
+            tokens = reduce( lambda s1, l2: s1.union(set(l2)),
+                         [[token for token in t['text'].split()
+                            if token.startswith(('@', '+', '#'))] for t in grepped_tasks],
+                            set(),
+                              )
 
-        grouped_tasks = dict([ 
-                            (token, filter(lambda t: token in t['text'].split(), 
-                                    grepped_tasks)) 
-                            for token in tokens])
+            grouped_tasks = dict([ 
+                                (token, filter(lambda t: token in t['text'].split(), 
+                                        grepped_tasks)) 
+                                for token in tokens])
+
+            grouped_tasks['none'] = [t for t in grepped_tasks 
+                    if all(map(lambda token: not token.startswith(('@','+','#')), t['text'].split()))
+                    ]
+        elif grep == '':
+            grouped_tasks =  {'%s' % kind: grepped_tasks} 
+        else:
+            grouped_tasks =  {"%s | grep '%s' " % (kind, grep): grepped_tasks} 
+
 
         plen = max(map(lambda t: len(t[label]), tasks.values())) if tasks else 0 
         for token, tasks in sorted(grouped_tasks.items()):
@@ -275,6 +285,9 @@ def _build_parser():
                        help="edit TASK to contain TEXT", metavar="TASK")
     actions.add_option("-f", "--finish", dest="finish",
                        help="mark TASK as finished", metavar="TASK")
+    actions.add_option("--editor", dest="open_editor",
+                       action="store_true", default=False,
+                       help="open task file in $EDITOR", metavar="TASK")
     parser.add_option_group(actions)
 
     config = OptionGroup(parser, "Configuration Options")
@@ -282,7 +295,7 @@ def _build_parser():
                       help="work on LIST", metavar="LIST")
     config.add_option("-t", "--task-dir", dest="taskdir", default="",
                       help="work on the lists in DIR", metavar="DIR")
-    config.add_option("-d", "--delete-if-empty",
+    config.add_option("--delete-if-empty",
                       action="store_true", dest="delete", default=False,
                       help="delete the task file if it becomes empty")
     parser.add_option_group(config)
@@ -296,6 +309,9 @@ def _build_parser():
     output.add_option("-q", "--quiet",
                       action="store_true", dest="quiet", default=False,
                       help="print less detailed output (no task ids, etc)")
+    output.add_option("-d", "--dump",
+                      action="store_true", dest="dump", default=False,
+                      help="dump the list without grouping")
     output.add_option("--done",
                       action="store_true", dest="done", default=False,
                       help="list done tasks instead of unfinished ones")
@@ -317,13 +333,17 @@ def _main():
         elif options.edit:
             td.edit_task(options.edit, text)
             td.write(options.delete)
+        elif options.open_editor:
+            os.system("$EDITOR %s" % os.path.join(
+                    os.path.expanduser(options.taskdir), options.name))
+
         elif text:
             td.add_task(text)
             td.write(options.delete)
         else:
             kind = 'tasks' if not options.done else 'done'
             td.print_list(kind=kind, verbose=options.verbose, quiet=options.quiet,
-                          grep=options.grep)
+                          grep=options.grep, dump=options.dump)
     except AmbiguousPrefix, e:
         sys.stderr.write('The ID "%s" matches more than one task.' % e.prefix)
     except UnknownPrefix, e:
